@@ -9,8 +9,10 @@ window.KURS_CONFIG = {
   answersUrl: '',
 
   // Идентификаторы скрытых вопросов формы. Менять, только если в форме заданы другие.
+  // У вопроса «Тренажёр» в форме остался автоматический идентификатор — он указан здесь.
+  // Если в форме поменять его на 'trainer', здесь тоже нужно вернуть 'trainer'.
   fields: {
-    room: 'room', fio: 'fio', group: 'group', trainer: 'trainer', score: 'score',
+    room: 'room', fio: 'fio', group: 'group', trainer: 'answer_short_text_9008990417627500', score: 'score',
     total: 'total', mistakes: 'mistakes', seconds: 'seconds', check: 'check', consent: 'consent'
   },
 

@@ -90,6 +90,7 @@
     <textarea id="paste" aria-label="Строки из Excel или коды результатов" placeholder="Вставьте сюда строки из Excel или коды результатов"></textarea>
     <div class="btn-row"><button class="btn" id="parse" type="button">Разобрать</button><button class="btn ghost" id="clear" type="button">Очистить</button></div>
     <p class="err" id="p-err" role="alert"></p>
+    <p class="hint hidden" id="p-warn" style="border-left:3px solid var(--amber);padding-left:10px"></p>
     <div id="res" class="hidden">
       <div class="filters">
         <label>Комната <select id="f-room"></select></label>
@@ -99,7 +100,7 @@
       <div class="tablewrap"><table class="restable" id="tbl"></table></div>
       <div id="top"></div>
       <div class="btn-row"><button class="btn ghost" id="csv" type="button">Скачать для Excel (CSV)</button></div>
-      <p class="hint">«Проверка»: галочка — данные пришли такими, какими их сформировал тренажёр. Крестик — числа или фамилию правили вручную после прохождения.</p>
+      <p class="hint">«Проверка»: галочка — данные пришли такими, какими их сформировал тренажёр. Галочка со звёздочкой — название тренажёра не дошло до формы и восстановлено по коду комнаты, остальное совпало. Крестик — данные изменились после прохождения: их правили вручную или форма настроена не полностью (подсказка выше).</p>
     </div>
   </section>
 
@@ -227,9 +228,31 @@
         total: g('total'), mistakes: g('mistakes'), seconds: g('seconds'), check: g('check'), sent: g('sent'), source: 'форма' };
       if (!r.fio && !r.check) return;
       r.valid = K.hash(K.payload(r)) === r.check;
+      // Тренажёр не дошёл до формы (ошибка в идентификаторе вопроса): восстанавливаем по букве кода комнаты
+      // и засчитываем, только если с ним сходится контрольный код
+      if (!r.valid && !r.trainer) {
+        const byRoom = K.TRAINERS[(r.room || '')[0]];
+        const cand = (byRoom ? [byRoom] : []).concat(Object.values(K.TRAINERS));
+        for (const t of cand) {
+          if (K.hash(K.payload(Object.assign({}, r, { trainer: t.title }))) === r.check) {
+            r.trainer = t.title;
+            r.valid = true;
+            r.note = 'название тренажёра восстановлено по коду комнаты';
+            break;
+          }
+        }
+      }
       out.push(r);
     });
-    return { out, head: !!head };
+    // подсказка о настройке формы: колонки, которых нет или которые пустые во всех строках
+    const warn = [];
+    if (head && out.length) {
+      ['room', 'fio', 'group', 'trainer', 'score', 'total', 'mistakes', 'seconds', 'check'].forEach(k => {
+        if (idx[k] < 0) warn.push('в выгрузке нет колонки «' + K.FIELD_TITLES[k] + '»');
+        else if (out.every(r => !r[k] || r.note && k === 'trainer')) warn.push('колонка «' + K.FIELD_TITLES[k] + '» пустая во всех строках');
+      });
+    }
+    return { out, head: !!head, warn };
   }
 
   $('#parse').addEventListener('click', () => {
@@ -246,6 +269,14 @@
       return;
     }
     err.textContent = '';
+    const warn = $('#p-warn');
+    const fixed = rows.filter(r => r.note).length;
+    const notes = [];
+    if (ex.warn && ex.warn.length) notes.push('Похоже, форма настроена не полностью: ' + ex.warn.join('; ') +
+      '. Проверьте идентификаторы этих вопросов в форме и в config.js (раздел 3 ниже).');
+    if (fixed) notes.push('В ' + fixed + ' стр. название тренажёра не дошло до формы и восстановлено по коду комнаты; контрольный код с ним совпал.');
+    warn.textContent = notes.join(' ');
+    warn.classList.toggle('hidden', !notes.length);
     fillFilters();
     render();
     $('#res').classList.remove('hidden');
@@ -295,7 +326,7 @@
         return '<tr><td>' + esc(r.group) + '</td><td>' + esc(r.fio) + (r.attempt > 1 ? ' <span class="badge">попытка ' + r.attempt + '</span>' : '') +
           '</td><td>' + esc(r.trainer) + '</td><td>' + esc(r.room) + '</td><td class="num">' + esc(r.score) + ' из ' + esc(r.total) +
           ' · ' + p + ' %</td><td>' + lv.text + '</td><td class="num">' + fmtTime(r.seconds) + '</td><td>' + mist +
-          '</td><td>' + (r.valid ? '<span class="okc" title="контрольный код совпал">✓</span>' : '<span class="badc" title="данные изменены после прохождения">✗ изменено</span>') +
+          '</td><td>' + (r.valid ? '<span class="okc" title="' + esc(r.note || 'контрольный код совпал') + '">✓' + (r.note ? '*' : '') + '</span>' : '<span class="badc" title="данные изменены после прохождения">✗ изменено</span>') +
           '</td><td>' + esc(r.sent || r.source) + '</td></tr>';
       }).join('') + '</tbody>';
 
