@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="kurs.css">
+<link rel="stylesheet" href="kurs.css?v=20261007b">
 <style>
   .join{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
   .join .field{flex:1 1 220px;margin:0}
@@ -73,8 +73,8 @@
     <p>Сам сайт ничего не хранит и никуда не отправляет. <a href="consent.html">Согласие на обработку персональных данных</a>.</p>
   </footer>
 </div>
-<script src="config.js"></script>
-<script src="kurs.js"></script>
+<script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>');</script>
+<script src="kurs.js?v=20261007b"></script>
 <script>
 (function () {
   'use strict';
