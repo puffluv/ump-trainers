@@ -41,6 +41,13 @@
   .restable th,.restable td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
   .restable th{color:var(--ink-dim);font-weight:500;font-size:13px}
   .restable td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .restable tr.grouphead td{background:var(--panel-2);border-top:2px solid var(--line);padding:10px 8px}
+  .restable tr.grouphead b{font-size:16px;margin-right:12px}
+  .restable tr.grouphead span{color:var(--ink-dim);font-size:13px;margin-right:14px;white-space:nowrap}
+  .grtable{min-width:640px;margin:6px 0 16px}
+  .grtable button{border:0;background:none;color:var(--ok);font:inherit;font-weight:600;cursor:pointer;padding:0;text-decoration:underline}
+  .toggle{display:flex;align-items:center;gap:8px;cursor:pointer}
+  .toggle input{width:20px;height:20px;accent-color:var(--ok)}
   .okc{color:var(--ok);font-weight:600}
   .badc{color:var(--no);font-weight:600}
   .top li{margin-bottom:6px;font-size:15px}
@@ -93,13 +100,20 @@
     <p class="hint hidden" id="p-warn" style="border-left:3px solid var(--amber);padding-left:10px"></p>
     <div id="res" class="hidden">
       <div class="filters">
+        <label>Группа <select id="f-gr"></select></label>
         <label>Комната <select id="f-room"></select></label>
         <label>Тренажёр <select id="f-tr"></select></label>
+        <label class="toggle"><input type="checkbox" id="f-bygroup" checked> по группам</label>
       </div>
       <div class="stats" id="stats"></div>
+      <div id="groups"></div>
       <div class="tablewrap"><table class="restable" id="tbl"></table></div>
       <div id="top"></div>
-      <div class="btn-row"><button class="btn ghost" id="csv" type="button">Скачать для Excel (CSV)</button></div>
+      <div class="btn-row">
+        <button class="btn ghost" id="csv" type="button">Скачать результаты (CSV)</button>
+        <button class="btn ghost" id="csv-groups" type="button">Скачать сводку по группам (CSV)</button>
+      </div>
+      <p class="hint">Итоги по группам считаются по лучшей попытке студента в каждом тренажёре: повторные прохождения не тянут средний вниз.</p>
       <p class="hint">«Проверка»: галочка — данные пришли такими, какими их сформировал тренажёр. Галочка со звёздочкой — название тренажёра не дошло до формы и восстановлено по коду комнаты, остальное совпало. Крестик — данные изменились после прохождения: их правили вручную или форма настроена не полностью (подсказка выше).</p>
     </div>
   </section>
@@ -285,18 +299,41 @@
 
   function fillFilters() {
     const opts = (vals, all) => '<option value="">' + all + '</option>' + vals.map(v => '<option>' + esc(v) + '</option>').join('');
+    $('#f-gr').innerHTML = opts([...new Set(rows.map(r => r.group))].filter(Boolean).sort((a, b) => a.localeCompare(b, 'ru')), 'все');
     $('#f-room').innerHTML = opts([...new Set(rows.map(r => r.room))].filter(Boolean).sort(), 'все');
     $('#f-tr').innerHTML = opts([...new Set(rows.map(r => r.trainer))].filter(Boolean).sort(), 'все');
   }
-  $('#f-room').addEventListener('change', render);
-  $('#f-tr').addEventListener('change', render);
+  ['#f-gr', '#f-room', '#f-tr', '#f-bygroup'].forEach(s => $(s).addEventListener('change', render));
 
   const pctOf = r => (Number(r.total) ? Math.round(Number(r.score) / Number(r.total) * 100) : 0);
   const fmtTime = s => { s = Number(s) || 0; return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  const byRu = (a, b) => a.localeCompare(b, 'ru');
+
+  // итоги набора строк: по лучшей попытке каждого студента в каждом тренажёре
+  function summary(list) {
+    const best = {};
+    list.forEach(r => {
+      const k = r.fio + '|' + r.group + '|' + r.trainer;
+      if (!best[k] || pctOf(r) > pctOf(best[k])) best[k] = r;
+    });
+    const b = Object.values(best).map(pctOf);
+    const lv = { hi: 0, mid: 0, low: 0, fail: 0 };
+    b.forEach(p => { if (p >= 90) lv.hi++; else if (p >= 75) lv.mid++; else if (p >= 61) lv.low++; else lv.fail++; });
+    return {
+      people: new Set(list.map(r => r.fio + '|' + r.group)).size,
+      results: list.length,
+      avg: b.length ? Math.round(b.reduce((s, x) => s + x, 0) / b.length) : 0,
+      passed: b.filter(p => p >= 61).length,
+      pairs: b.length,
+      bad: list.filter(r => !r.valid).length,
+      lv
+    };
+  }
+  const groupsOf = list => [...new Set(list.map(r => r.group || '—'))].sort(byRu);
 
   function visible() {
-    const fr = $('#f-room').value, ft = $('#f-tr').value;
-    const list = rows.filter(r => (!fr || r.room === fr) && (!ft || r.trainer === ft));
+    const fg = $('#f-gr').value, fr = $('#f-room').value, ft = $('#f-tr').value;
+    const list = rows.filter(r => (!fg || r.group === fg) && (!fr || r.room === fr) && (!ft || r.trainer === ft));
     list.sort((a, b) => (a.group + a.fio + a.trainer + a.sent).localeCompare(b.group + b.fio + b.trainer + b.sent, 'ru'));
     const seen = {};
     list.forEach(r => { const k = r.fio + '|' + r.group + '|' + r.trainer; seen[k] = (seen[k] || 0) + 1; r.attempt = seen[k]; });
@@ -305,30 +342,60 @@
 
   function render() {
     const list = visible();
-    const pcts = list.map(pctOf);
-    const avg = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : 0;
-    const passed = pcts.filter(p => p >= 61).length;
-    const people = new Set(list.map(r => r.fio + '|' + r.group)).size;
-    const bad = list.filter(r => !r.valid).length;
+    const t = summary(list);
     $('#stats').innerHTML =
-      '<div><span>Результатов</span><b>' + list.length + '</b></div>' +
-      '<div><span>Студентов</span><b>' + people + '</b></div>' +
-      '<div><span>Средний результат</span><b>' + avg + ' %</b></div>' +
-      '<div><span>Не ниже 61 %</span><b>' + passed + ' из ' + list.length + '</b></div>' +
-      '<div><span>Не прошли проверку</span><b' + (bad ? ' class="badc"' : '') + '>' + bad + '</b></div>';
+      '<div><span>Групп</span><b>' + groupsOf(list).length + '</b></div>' +
+      '<div><span>Студентов</span><b>' + t.people + '</b></div>' +
+      '<div><span>Отправок</span><b>' + t.results + '</b></div>' +
+      '<div><span>Средний результат</span><b>' + t.avg + ' %</b></div>' +
+      '<div><span>Не ниже 61 %</span><b>' + t.passed + ' из ' + t.pairs + '</b></div>' +
+      '<div><span>Не прошли проверку</span><b' + (t.bad ? ' class="badc"' : '') + '>' + t.bad + '</b></div>';
 
-    $('#tbl').innerHTML = '<thead><tr><th>Группа</th><th>ФИО</th><th>Тренажёр</th><th>Комната</th><th>Результат</th>' +
-      '<th>Уровень</th><th>Время</th><th>Ошибки в заданиях</th><th>Проверка</th><th>Отправлено</th></tr></thead><tbody>' +
-      list.map(r => {
-        const p = pctOf(r), lv = K.level(p), letter = K.letterByTitle(r.trainer);
-        const ids = r.mistakes && r.mistakes !== 'нет' ? r.mistakes.split(';').map(s => s.trim()).filter(Boolean) : [];
-        const mist = ids.length ? ids.map(id => '<span title="' + esc(K.data.shortTitle(letter, id)) + '">' + esc(id) + '</span>').join(', ') : '—';
-        return '<tr><td>' + esc(r.group) + '</td><td>' + esc(r.fio) + (r.attempt > 1 ? ' <span class="badge">попытка ' + r.attempt + '</span>' : '') +
-          '</td><td>' + esc(r.trainer) + '</td><td>' + esc(r.room) + '</td><td class="num">' + esc(r.score) + ' из ' + esc(r.total) +
-          ' · ' + p + ' %</td><td>' + lv.text + '</td><td class="num">' + fmtTime(r.seconds) + '</td><td>' + mist +
-          '</td><td>' + (r.valid ? '<span class="okc" title="' + esc(r.note || 'контрольный код совпал') + '">✓' + (r.note ? '*' : '') + '</span>' : '<span class="badc" title="данные изменены после прохождения">✗ изменено</span>') +
-          '</td><td>' + esc(r.sent || r.source) + '</td></tr>';
-      }).join('') + '</tbody>';
+    const grouped = $('#f-bygroup').checked;
+    const groups = groupsOf(list);
+
+    // сводка по группам — когда групп больше одной
+    $('#groups').innerHTML = grouped && groups.length > 1
+      ? '<h3 style="margin-top:6px">По группам</h3><div class="tablewrap"><table class="restable grtable"><thead><tr>' +
+        '<th>Группа</th><th>Студентов</th><th>Отправок</th><th>Средний результат</th><th>Не ниже 61 %</th>' +
+        '<th>Высокий / средний / низкий / не зачтено</th><th>Не прошли проверку</th></tr></thead><tbody>' +
+        groups.map(g => {
+          const s = summary(list.filter(r => (r.group || '—') === g));
+          return '<tr><td><button type="button" data-group="' + esc(g) + '" title="Показать только эту группу">' + esc(g) + '</button></td>' +
+            '<td class="num">' + s.people + '</td><td class="num">' + s.results + '</td><td class="num">' + s.avg + ' %</td>' +
+            '<td class="num">' + s.passed + ' из ' + s.pairs + '</td><td class="num">' + s.lv.hi + ' / ' + s.lv.mid + ' / ' + s.lv.low + ' / ' + s.lv.fail +
+            '</td><td class="num' + (s.bad ? ' badc' : '') + '">' + s.bad + '</td></tr>';
+        }).join('') + '</tbody></table></div>'
+      : '';
+    $('#groups').querySelectorAll('button[data-group]').forEach(b => b.addEventListener('click', () => {
+      $('#f-gr').value = b.dataset.group;
+      render();
+    }));
+
+    const rowHtml = r => {
+      const p = pctOf(r), lv = K.level(p), letter = K.letterByTitle(r.trainer);
+      const ids = r.mistakes && r.mistakes !== 'нет' ? r.mistakes.split(';').map(s => s.trim()).filter(Boolean) : [];
+      const mist = ids.length ? ids.map(id => '<span title="' + esc(K.data.shortTitle(letter, id)) + '">' + esc(id) + '</span>').join(', ') : '—';
+      return '<tr>' + (grouped ? '' : '<td>' + esc(r.group) + '</td>') + '<td>' + esc(r.fio) + (r.attempt > 1 ? ' <span class="badge">попытка ' + r.attempt + '</span>' : '') +
+        '</td><td>' + esc(r.trainer) + '</td><td>' + esc(r.room) + '</td><td class="num">' + esc(r.score) + ' из ' + esc(r.total) +
+        ' · ' + p + ' %</td><td>' + lv.text + '</td><td class="num">' + fmtTime(r.seconds) + '</td><td>' + mist +
+        '</td><td>' + (r.valid ? '<span class="okc" title="' + esc(r.note || 'контрольный код совпал') + '">✓' + (r.note ? '*' : '') + '</span>' : '<span class="badc" title="данные изменены после прохождения">✗ изменено</span>') +
+        '</td><td>' + esc(r.sent || r.source) + '</td></tr>';
+    };
+    const cols = grouped ? 9 : 10;
+    const head = '<thead><tr>' + (grouped ? '' : '<th>Группа</th>') + '<th>ФИО</th><th>Тренажёр</th><th>Комната</th><th>Результат</th>' +
+      '<th>Уровень</th><th>Время</th><th>Ошибки в заданиях</th><th>Проверка</th><th>Отправлено</th></tr></thead>';
+    $('#tbl').innerHTML = head + '<tbody>' + (grouped
+      ? groups.map(g => {
+          const part = list.filter(r => (r.group || '—') === g);
+          const s = summary(part);
+          return '<tr class="grouphead"><td colspan="' + cols + '"><b>' + esc(g) + '</b>' +
+            '<span>студентов: ' + s.people + '</span><span>средний результат: ' + s.avg + ' %</span>' +
+            '<span>не ниже 61 %: ' + s.passed + ' из ' + s.pairs + '</span>' +
+            (s.bad ? '<span class="badc">не прошли проверку: ' + s.bad + '</span>' : '') + '</td></tr>' +
+            part.map(rowHtml).join('');
+        }).join('')
+      : list.map(rowHtml).join('')) + '</tbody>';
 
     // самые частые ошибки — по каждому тренажёру отдельно
     const byTr = {};
@@ -357,6 +424,23 @@
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'результаты-тренажёров.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  });
+
+  $('#csv-groups').addEventListener('click', () => {
+    const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const list = visible();
+    const head = ['Группа', 'Студентов', 'Отправок', 'Средний результат, %', 'Не ниже 61 %', 'Из них', 'Высокий', 'Средний', 'Низкий', 'Не зачтено', 'Не прошли проверку'];
+    const body = groupsOf(list).map(g => {
+      const s = summary(list.filter(r => (r.group || '—') === g));
+      return [g, s.people, s.results, s.avg, s.passed, s.pairs, s.lv.hi, s.lv.mid, s.lv.low, s.lv.fail, s.bad].map(q).join(';');
+    });
+    const blob = new Blob(['﻿' + [head.map(q).join(';')].concat(body).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'сводка-по-группам.csv';
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
