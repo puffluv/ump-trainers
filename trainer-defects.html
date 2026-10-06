@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Классификация замечаний</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="kurs.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar"><a href="index.html">← Все тренажёры</a><button class="theme-btn" type="button">Светлая тема</button></div>
+  <header>
+    <p class="kicker">Дополнительно · приёмка мультимедиа-продукта (вне тем курса)</p>
+    <h1>Классификация замечаний</h1>
+    <p class="sub">Заказчик прислал список правок. Определите категорию каждой по правилам приёмки из чек-листа приёмки мультимедиа-продукта.</p>
+  </header>
+
+  <div class="layout">
+    <main class="card" id="quiz"></main>
+
+    <aside class="panel">
+      <h2>Категории замечаний</h2>
+      <table class="mini">
+        <tbody>
+          <tr><th>Блокирующее</th><td>Продуктом нельзя пользоваться по назначению: не открывается, ключевой сценарий не проходит, нет раздела из ТЗ. Приёмка не проходит.</td></tr>
+          <tr><th>Существенное</th><td>Продукт работает, но заметно расходится с ТЗ или макетом либо мешает основному сценарию. Приёмка не проходит.</td></tr>
+          <tr><th>Незначительное</th><td>Мелкое отклонение, не мешающее использованию. Устраняется в согласованный срок.</td></tr>
+          <tr><th>Пожелание</th><td>Требование сверх ТЗ. Не замечание, а новая задача с отдельной оценкой срока.</td></tr>
+        </tbody>
+      </table>
+      <p class="hint">Граница между существенным замечанием и пожеланием проходит там, где заканчивается согласованное задание.</p>
+    </aside>
+  </div>
+
+  <footer>
+    <p><b>Зачем это нужно.</b> Без отдельной категории «пожелание» запрос на новый раздел попадает в список правок и выполняется бесплатно, а срок сдачи сдвигается за счёт исполнителя.</p>
+    <p>Спорные карточки — не ошибка тренажёра, а повод для обсуждения на занятии.</p>
+  </footer>
+</div>
+
+<script src="config.js"></script>
+<script src="kurs.js"></script>
+<script src="kurs-data.js"></script>
+<script>
+(function () {
+  'use strict';
+  const K = window.Kurs, esc = K.esc;
+  K.initTheme();
+  const CATS = K.data.Z_CATS;
+  const name = id => CATS.find(c => c.id === id).name;
+
+  K.quiz({
+    letter: 'Z',
+    mount: document.getElementById('quiz'),
+    items: K.data.Z,
+    selfItems: K.data.Z_SELF,
+    goals: [
+      'различать блокирующие, существенные и незначительные замечания',
+      'отделять пожелания сверх задания от замечаний к работе',
+      'понимать, какие замечания останавливают приёмку'
+    ],
+    facts: ['12 замечаний', 'около 10 минут', 'разбор после каждого ответа'],
+    layout: 'four',
+    shuffleItems: true,
+    prompt: it => '<span class="tag">' + esc(it.ctx) + '</span><p class="prompt">' + esc(it.text) + '</p>',
+    options: () => CATS.map(c => ({ v: c.id, html: '<b>' + esc(c.name) + '</b><small>' + esc(c.hint) + '</small>' })),
+    isRight: (it, v) => v === it.a,
+    rightText: it => name(it.a).toLowerCase(),
+    explain: it => '<p>' + esc(it.why) + '</p>',
+    ref: () => 'чек-лист приёмки мультимедиа-продукта, «Классификация замечаний»',
+    short: it => it.text,
+    finalNote: pct => pct >= 90
+      ? 'Категории различаются уверенно. Можно переходить к перекрёстной приёмке.'
+      : pct >= 61
+        ? 'Основное понятно. Стоит ещё раз разобрать границу между существенным замечанием и пожеланием.'
+        : 'Вернитесь к правилам приёмки и пройдите карточки заново.'
+  });
+})();
+</script>
+</body>
+</html>

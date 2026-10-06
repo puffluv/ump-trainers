@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Согласие на обработку данных</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="kurs.css">
+<style>
+  .doc{max-width:72ch}
+  .doc ol{padding-left:22px}
+  .doc li{margin-bottom:12px}
+  .warn{border:1px solid var(--no);background:var(--no-bg);border-radius:10px;padding:12px 16px;margin:0 0 18px;font-size:15px}
+  .fill{color:var(--amber)}
+</style>
+</head>
+<body>
+<div class="wrap narrow">
+  <div class="topbar"><a href="index.html">← Все тренажёры</a><button class="theme-btn" type="button">Светлая тема</button></div>
+  <div class="card doc">
+    <p class="warn hidden" id="warn">Оператор персональных данных не указан. Преподавателю: заполните раздел <code>operator</code> в файле <code>config.js</code>, текст согласуйте с вузом.</p>
+    <p class="kicker">Отдельный документ</p>
+    <h1 style="font-size:28px">Согласие на обработку персональных данных</h1>
+    <p>Отмечая в тренажёре согласие и отправляя результат через Яндекс Форму, я, действуя свободно, своей волей и в своём интересе, даю конкретное, предметное, информированное, сознательное и однозначное согласие на обработку моих персональных данных на следующих условиях.</p>
+    <ol>
+      <li><b>Оператор:</b> <span class="fill" id="op-name">не указан</span><span id="op-addr-wrap">, адрес: <span class="fill" id="op-addr">не указан</span></span>.</li>
+      <li><b>Цель обработки:</b> учёт результатов учебной работы по дисциплине «Управление мультимедиа проектами» и выставление оценок текущего контроля.</li>
+      <li><b>Перечень данных:</b> фамилия и имя; учебная группа; код комнаты (занятия); название тренажёра; число верных ответов, номера заданий с ошибками, время прохождения; дата и время отправки результата.</li>
+      <li><b>Действия с данными:</b> сбор, запись, систематизация, накопление, хранение, уточнение, использование для учёта успеваемости, удаление. Обработка автоматизированная: результат передаётся оператору через сервис Яндекс Формы. Третьим лицам данные не передаются, кроме случаев, предусмотренных законом.</li>
+      <li><b>Срок действия:</b> до <span class="fill" id="op-until">окончания изучения дисциплины</span>. После этого срока данные удаляются.</li>
+      <li><b>Отзыв согласия:</b> согласие можно отозвать в любой момент, направив оператору заявление: <span class="fill" id="op-contact">контакт не указан</span>. Отзыв не влияет на обработку, проведённую до его получения.</li>
+      <li><b>Отказ не влечёт последствий для учёбы.</b> Без согласия тренажёры доступны в режиме самопроверки, а результат можно показать преподавателю лично.</li>
+    </ol>
+    <p class="hint">Согласие даётся отдельно от других документов в соответствии со статьёй 9 Федерального закона от 27.07.2006 № 152-ФЗ «О персональных данных».</p>
+  </div>
+</div>
+<script src="config.js"></script>
+<script src="kurs.js"></script>
+<script>
+(function () {
+  'use strict';
+  const K = window.Kurs;
+  K.initTheme();
+  const op = (K.config && K.config.operator) || {};
+  const set = (id, v) => { if (v) { const el = document.getElementById(id); el.textContent = v; el.classList.remove('fill'); } };
+  set('op-name', op.name);
+  set('op-addr', op.address);
+  set('op-until', op.keepUntil);
+  set('op-contact', op.contact);
+  if (!op.address) document.getElementById('op-addr-wrap').classList.add('hidden');
+  if (!op.name) document.getElementById('warn').classList.remove('hidden');
+})();
+</script>
+</body>
+</html>

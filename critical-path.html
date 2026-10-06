@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Сетевой график и критический путь</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="kurs.css">
+<style>
+  .stage{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px;overflow-x:auto}
+  canvas{display:block}
+  .works{margin-top:16px}
+  .works table{width:100%;border-collapse:collapse;font-size:15px}
+  .works th,.works td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right}
+  .works th:first-child,.works td:first-child{text-align:left}
+  .works th{color:var(--ink-dim);font-weight:500;font-size:13px;line-height:1.3}
+  .works td{font-variant-numeric:tabular-nums}
+  .works tr.crit td:first-child{color:var(--amber);font-weight:500}
+  .dur{display:inline-flex;align-items:center;gap:6px}
+  .dur button{width:32px;height:32px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--ink);
+    font:inherit;font-size:17px;line-height:1;cursor:pointer;padding:0}
+  .dur button:hover{border-color:var(--ink-dim)}
+  .dur b{min-width:22px;text-align:center;font-weight:500}
+  .readout{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+  @media (max-width:560px){.readout{grid-template-columns:1fr}}
+  .readout div{background:var(--panel-2);border-radius:10px;padding:10px 14px}
+  .readout span{display:block;font-size:13px;color:var(--ink-dim)}
+  .readout b{font-size:22px;font-variant-numeric:tabular-nums}
+  .path{margin:12px 0 0;color:var(--amber);font-size:16px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:14px;color:var(--ink-dim)}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar"><a href="index.html">← Все тренажёры</a><button class="theme-btn" type="button">Светлая тема</button></div>
+  <header>
+    <p class="kicker">Тема 2 · Лекция 3 «Управление сроками проекта»</p>
+    <h1>Сетевой график и критический путь</h1>
+    <p class="sub">Проект — выпуск промо-ролика. Меняйте длительности работ и смотрите, как перестраивается критический путь и сдвигается окончание проекта. Ответы на задания в блоке заданий можно проверить на графике.</p>
+  </header>
+
+  <div class="layout wide-panel">
+    <main>
+      <div class="stage"><canvas id="net" role="img" aria-label="Сетевой график работ проекта"></canvas></div>
+      <div class="legend">
+        <span><i style="background:var(--amber)"></i>критический путь</span>
+        <span><i style="background:var(--ok)"></i>есть резерв работы</span>
+      </div>
+      <div class="readout">
+        <div><span>Длительность проекта</span><b id="total">—</b></div>
+        <div><span>Работ на критическом пути</span><b id="ncrit">—</b></div>
+      </div>
+      <p class="path" id="path"></p>
+      <div class="works card">
+        <h2 style="font-size:17px">Работы проекта</h2>
+        <table>
+          <thead><tr><th>Работа</th><th>Длительность,<br>раб. дни</th><th>Ранний<br>старт, день</th><th>Резерв<br>работы, дни</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="btn-row"><button class="btn ghost" id="reset" type="button">Вернуть исходные длительности</button></div>
+      </div>
+    </main>
+
+    <aside class="card" id="quiz"></aside>
+  </div>
+
+  <footer>
+    <p><b>Длительность — не трудоёмкость.</b> В графике стоит длительность: сколько рабочих дней работа идёт по календарю. Трудоёмкость — затраты труда в человеко-днях. Работа трудоёмкостью 6 человеко-дней, которую выполняют двое, длится 3 дня (лекция 3, стр. 3).</p>
+    <p><b>Критический путь</b> — самая длинная цепочка работ от начала до конца проекта. Её длина и есть минимальный срок: сократить проект, не трогая эти работы, невозможно.</p>
+    <p><b>Два резерва.</b> Резерв работы показывает, на сколько дней работу можно задержать, не сдвинув окончание проекта; его не закладывают, он получается из расчёта графика, а у работ критического пути равен нулю. Резерв времени — запас, который руководитель сознательно добавляет к плану на случай рисков (лекция 3: около 20 % для работ, которые почти никогда не укладываются в срок).</p>
+    <p>Попробуйте увеличивать длительность работы с резервом по одному дню. В какой-то момент резерв закончится, и путь через эту работу сам станет критическим — так и бывает, когда «некритичная» задача потихоньку разрастается.</p>
+  </footer>
+</div>
+
+<script src="config.js"></script>
+<script src="kurs.js"></script>
+<script src="kurs-data.js"></script>
+<script>
+(function () {
+  'use strict';
+  const K = window.Kurs, esc = K.esc;
+  K.initTheme();
+
+  // ---------- модель сетевого графика ----------
+  const BASE = K.data.S_NET;
+  let T = BASE.map(t => Object.assign({}, t, { pre: t.pre.slice() }));
+  const cv = document.getElementById('net');
+  const ctx = cv.getContext('2d');
+  const NW = 168, NH = 62, GX = 58, GY = 18;
+  const col = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  function draw() {
+    const r = K.cpm(T);
+    const C = { crit: col('--amber'), slack: col('--ok'), line: col('--line'), ink: col('--ink'), dim: col('--ink-dim') };
+    const levels = {};
+    T.forEach(t => (levels[r.lvl[t.id]] = levels[r.lvl[t.id]] || []).push(t.id));
+    const maxL = Math.max(...Object.keys(levels).map(Number));
+    const maxRows = Math.max(...Object.values(levels).map(a => a.length));
+    const W = (maxL + 1) * NW + maxL * GX + 24;
+    const H = maxRows * NH + (maxRows - 1) * GY + 24;
+    const dpr = window.devicePixelRatio || 1;
+    cv.style.width = W + 'px';
+    cv.style.height = H + 'px';
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    const pos = {};
+    Object.entries(levels).forEach(([l, ids]) => {
+      const blockH = ids.length * NH + (ids.length - 1) * GY;
+      ids.forEach((id, i) => { pos[id] = { x: 12 + l * (NW + GX), y: (H - blockH) / 2 + i * (NH + GY) }; });
+    });
+
+    T.forEach(t => t.pre.forEach(p => {
+      const a = pos[p], b = pos[t.id];
+      const crit = r.slack[p] === 0 && r.slack[t.id] === 0 && r.EF[p] === r.ES[t.id];
+      const x1 = a.x + NW, y1 = a.y + NH / 2, x2 = b.x, y2 = b.y + NH / 2;
+      ctx.strokeStyle = crit ? C.crit : C.line;
+      ctx.lineWidth = crit ? 2.5 : 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.bezierCurveTo(x1 + GX * 0.55, y1, x2 - GX * 0.55, y2, x2 - 7, y2);
+      ctx.stroke();
+      ctx.fillStyle = crit ? C.crit : C.line;
+      ctx.beginPath();
+      ctx.moveTo(x2, y2); ctx.lineTo(x2 - 8, y2 - 4.5); ctx.lineTo(x2 - 8, y2 + 4.5);
+      ctx.closePath();
+      ctx.fill();
+    }));
+
+    T.forEach(t => {
+      const p = pos[t.id], crit = r.slack[t.id] === 0;
+      ctx.globalAlpha = crit ? 0.16 : 0.09;
+      ctx.fillStyle = crit ? C.crit : C.slack;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(p.x, p.y, NW, NH, 8) : ctx.rect(p.x, p.y, NW, NH);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = crit ? C.crit : C.line;
+      ctx.lineWidth = crit ? 2 : 1.4;
+      ctx.stroke();
+      ctx.fillStyle = C.ink;
+      ctx.font = '500 13px "Golos Text", system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(t.id + '. ' + t.name, p.x + 10, p.y + 21, NW - 20);
+      ctx.font = '12px "Golos Text", system-ui, sans-serif';
+      ctx.fillStyle = crit ? C.crit : C.dim;
+      ctx.fillText('длит. ' + t.dur + ' дн · старт ' + r.ES[t.id], p.x + 10, p.y + 39, NW - 20);
+      ctx.fillStyle = C.dim;
+      ctx.fillText(crit ? 'критическая, резерва нет' : 'резерв работы ' + r.slack[t.id] + ' дн', p.x + 10, p.y + 54, NW - 20);
+    });
+
+    document.getElementById('rows').innerHTML = T.map(t =>
+      '<tr class="' + (r.slack[t.id] === 0 ? 'crit' : '') + '">' +
+      '<td>' + t.id + '. ' + esc(t.name) + '</td>' +
+      '<td><span class="dur"><button type="button" data-id="' + t.id + '" data-d="-1" aria-label="Уменьшить длительность ' + esc(t.name) + '">−</button><b>' + t.dur +
+      '</b><button type="button" data-id="' + t.id + '" data-d="1" aria-label="Увеличить длительность ' + esc(t.name) + '">+</button></span></td>' +
+      '<td>' + r.ES[t.id] + '</td><td>' + r.slack[t.id] + '</td></tr>').join('');
+    document.querySelectorAll('.dur button').forEach(b => {
+      b.onclick = () => {
+        const t = T.find(x => x.id === b.dataset.id);
+        t.dur = Math.max(1, Math.min(20, t.dur + Number(b.dataset.d)));
+        draw();
+        const again = document.querySelector('.dur button[data-id="' + b.dataset.id + '"][data-d="' + b.dataset.d + '"]');
+        if (again) again.focus();
+      };
+    });
+    document.getElementById('total').textContent = r.total + ' раб. дн.';
+    document.getElementById('ncrit').textContent = r.critical.length + ' из ' + T.length;
+    document.getElementById('path').textContent = 'Критический путь: ' + r.critical.join(' → ');
+  }
+
+  document.getElementById('reset').onclick = () => {
+    T = BASE.map(t => Object.assign({}, t, { pre: t.pre.slice() }));
+    draw();
+  };
+  window.addEventListener('resize', draw);
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+  draw();
+
+  // ---------- задания ----------
+  K.quiz({
+    letter: 'S',
+    mount: document.getElementById('quiz'),
+    items: K.data.S,
+    selfItems: K.data.S_SELF,
+    shuffleOptions: true,
+    goals: [
+      'находить срок проекта и критический путь по сетевому графику',
+      'отличать резерв работы от резерва времени',
+      'не путать длительность работы с её трудоёмкостью'
+    ],
+    facts: ['7 заданий', 'около 10 минут', 'ответы проверяются на графике'],
+    prompt: it => '<p class="prompt">' + esc(it.q) + '</p>',
+    options: it => it.opts.map((t, k) => ({ v: String(k), html: esc(t) })),
+    isRight: (it, v) => Number(v) === it.a,
+    rightText: it => it.opts[it.a],
+    explain: it => '<p>' + esc(it.why) + '</p>',
+    ref: it => (it.id === 7 ? 'лекция 3, стр. 4' : 'лекция 3, стр. 3–4'),
+    short: it => it.short,
+    finalNote: pct => pct >= 90
+      ? 'Сетевой график читается уверенно. Попробуйте построить такой же для своего проекта по колонке «Предшествующая подзадача» календарного плана.'
+      : pct >= 61
+        ? 'Основное понятно. Повторите разницу между резервом работы и резервом времени и между длительностью и трудоёмкостью.'
+        : 'Вернитесь к графику: найдите самую длинную цепочку и посмотрите, что происходит при задержке работы с резервом. Затем пройдите заново.'
+  });
+})();
+</script>
+</body>
+</html>

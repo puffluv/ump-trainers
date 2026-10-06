@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кабинет преподавателя</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="kurs.css">
+<style>
+  section.card{margin-bottom:18px}
+  .pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin:12px 0 0}
+  .pick label{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:10px;cursor:pointer;min-height:64px}
+  .pick label:has(input:checked){border-color:var(--amber);background:var(--amber-bg)}
+  .pick input{width:20px;height:20px;margin-top:3px;accent-color:var(--amber);flex:none}
+  .pick small{display:block;color:var(--ink-dim);font-size:13px}
+  .roombox{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:start;margin-top:18px;
+    padding-top:18px;border-top:1px solid var(--line)}
+  @media (max-width:700px){.roombox{grid-template-columns:1fr}}
+  .bigcode{font-size:56px;font-weight:700;letter-spacing:.12em;line-height:1.1;margin:0 0 6px}
+  .field input[readonly]{font-size:15px}
+  canvas.qr{display:block;border-radius:8px}
+  .screen{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
+  .screen .close{position:absolute;top:16px;right:16px}
+  .screen-in{display:flex;gap:48px;align-items:center;justify-content:center;flex-wrap:wrap;text-align:left}
+  .hugecode{font-size:clamp(72px,14vw,190px);font-weight:700;letter-spacing:.1em;line-height:1}
+  .s-how{font-size:clamp(18px,2.2vw,28px);color:var(--ink-dim);margin:16px 0 0;line-height:1.4}
+  .s-how b{color:var(--ink);word-break:break-all}
+  textarea{width:100%;min-height:150px;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);
+    color:var(--ink);font:13px/1.5 ui-monospace,Consolas,monospace}
+  .filters{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0 6px;font-size:15px}
+  .filters select{margin-left:6px;min-height:40px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);
+    background:var(--bg);color:var(--ink);font:inherit}
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:12px 0}
+  .stats div{background:var(--panel-2);border-radius:10px;padding:10px 14px}
+  .stats span{display:block;font-size:13px;color:var(--ink-dim)}
+  .stats b{font-size:22px;font-variant-numeric:tabular-nums}
+  .tablewrap{overflow-x:auto;margin-top:8px}
+  .restable{width:100%;border-collapse:collapse;font-size:14px;min-width:820px}
+  .restable th,.restable td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  .restable th{color:var(--ink-dim);font-weight:500;font-size:13px}
+  .restable td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .okc{color:var(--ok);font-weight:600}
+  .badc{color:var(--no);font-weight:600}
+  .top li{margin-bottom:6px;font-size:15px}
+  details.card > summary{cursor:pointer;list-style:none}
+  details.card > summary::-webkit-details-marker{display:none}
+  details.card > summary h2{display:inline}
+  details.card > summary::after{content:' ▾';color:var(--ink-dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar"><a href="index.html">← Все тренажёры</a><button class="theme-btn" type="button">Светлая тема</button></div>
+  <header>
+    <p class="kicker">Для преподавателя</p>
+    <h1>Кабинет преподавателя</h1>
+    <p class="sub">Создайте комнату для занятия, покажите код студентам, а после занятия разберите результаты из Яндекс Формы. Страница ничего не хранит: данные живут, пока она открыта.</p>
+  </header>
+
+  <section class="card">
+    <h2>1. Комната для занятия</h2>
+    <p class="hint" style="margin:0">Выберите тренажёр и нажмите кнопку — QR-код откроется на весь экран. Студенты сканируют его камерой телефона и сразу попадают в зачётный проход этой комнаты: остаётся ввести фамилию, имя и группу.</p>
+    <div class="pick" id="pick"></div>
+    <div class="btn-row">
+      <button class="btn" id="mk-show" type="button">Создать комнату и показать QR</button>
+      <button class="btn ghost" id="mk" type="button">Только создать</button>
+    </div>
+    <p class="err" id="r-warn"></p>
+    <div id="room" class="roombox hidden">
+      <div>
+        <p class="kicker" id="r-title"></p>
+        <div class="bigcode" id="r-code"></div>
+        <label class="field"><span>Ссылка для студентов</span><input id="r-link" readonly></label>
+        <div class="btn-row" style="margin-top:0">
+          <button class="btn" id="r-full" type="button">Показать на весь экран</button>
+          <button class="btn ghost" id="r-copy" type="button">Скопировать ссылку</button>
+        </div>
+        <p class="hint">Запишите код: по нему результаты этого занятия отбираются в выгрузке.</p>
+      </div>
+      <canvas class="qr" id="r-qr" aria-label="QR-код ссылки на комнату"></canvas>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2. Результаты</h2>
+    <p style="margin:0 0 8px">Результаты приходят в вашу Яндекс Форму. Выгрузите ответы в Excel, выделите таблицу вместе со строкой заголовков, скопируйте и вставьте ниже. Сюда же можно вставить коды результатов, которые студенты прислали сами, — строки вида <code>UMP1.…</code>.</p>
+    <p id="ans-link" class="hint"></p>
+    <textarea id="paste" aria-label="Строки из Excel или коды результатов" placeholder="Вставьте сюда строки из Excel или коды результатов"></textarea>
+    <div class="btn-row"><button class="btn" id="parse" type="button">Разобрать</button><button class="btn ghost" id="clear" type="button">Очистить</button></div>
+    <p class="err" id="p-err" role="alert"></p>
+    <div id="res" class="hidden">
+      <div class="filters">
+        <label>Комната <select id="f-room"></select></label>
+        <label>Тренажёр <select id="f-tr"></select></label>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="tablewrap"><table class="restable" id="tbl"></table></div>
+      <div id="top"></div>
+      <div class="btn-row"><button class="btn ghost" id="csv" type="button">Скачать для Excel (CSV)</button></div>
+      <p class="hint">«Проверка»: галочка — данные пришли такими, какими их сформировал тренажёр. Крестик — числа или фамилию правили вручную после прохождения.</p>
+    </div>
+  </section>
+
+  <details class="card">
+    <summary><h2>3. Настройка Яндекс Формы</h2></summary>
+    <p id="cfg-status" style="margin-top:12px"></p>
+    <p>В форме нужны вопросы типа «Короткий текст» с включённой опцией «Скрытый вопрос». Идентификатор вопроса — из левой колонки, заголовок — из правой: по заголовкам кабинет находит колонки в выгрузке.</p>
+    <table class="mini" id="fields"></table>
+    <div class="btn-row"><a class="btn ghost" id="test-link" target="_blank" rel="noopener">Открыть форму с тестовыми данными</a></div>
+    <p class="hint">Отправьте тестовый ответ, выгрузите ответы в Excel и вставьте строки в раздел «Результаты»: в колонке «Проверка» должна стоять галочка. Подробно — в README.md.</p>
+  </details>
+</div>
+
+<div id="screen" class="screen hidden" role="dialog" aria-label="Код комнаты для студентов">
+  <button class="btn ghost close" id="s-close" type="button">Закрыть</button>
+  <div class="screen-in">
+    <div>
+      <p class="kicker" id="s-title" style="font-size:20px"></p>
+      <div class="hugecode" id="s-code"></div>
+      <p class="s-how">Наведите камеру телефона на QR-код<br>или откройте <b id="s-site"></b> и введите код</p>
+    </div>
+    <canvas class="qr" id="s-qr"></canvas>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="kurs.js"></script>
+<script src="kurs-data.js"></script>
+<script src="qr.js"></script>
+<script>
+(function () {
+  'use strict';
+  const K = window.Kurs, esc = K.esc, $ = K.$;
+  K.initTheme();
+
+  // ---------- 1. комната ----------
+  const order = ['P', 'T', 'S', 'Z'];
+  $('#pick').innerHTML = order.map((l, i) => {
+    const t = K.TRAINERS[l];
+    return '<label><input type="radio" name="tr" value="' + l + '"' + (i === 0 ? ' checked' : '') + '><span>' +
+      esc(t.title) + '<small>' + esc(t.topic) + '</small></span></label>';
+  }).join('');
+  let current = null;
+  const siteRoot = () => new URL('index.html', location.href).toString().replace(/index\.html$/, '');
+
+  function makeRoom() {
+    const l = document.querySelector('input[name="tr"]:checked').value;
+    const t = K.TRAINERS[l];
+    const code = K.makeRoom(l);
+    const u = new URL(t.file, location.href);
+    u.searchParams.set('room', code);
+    current = { code, title: t.title, link: u.toString() };
+    $('#r-title').textContent = t.title;
+    $('#r-code').textContent = code;
+    $('#r-link').value = current.link;
+    K.drawQR($('#r-qr'), current.link, 240);
+    $('#room').classList.remove('hidden');
+    $('#r-warn').textContent = location.protocol === 'file:'
+      ? 'Кабинет открыт как файл с компьютера: телефоны студентов не откроют такую ссылку. Откройте кабинет по адресу сайта (GitHub Pages) и создайте комнату там.'
+      : '';
+  }
+  $('#mk').addEventListener('click', makeRoom);
+  $('#r-copy').addEventListener('click', e => K.copy(current.link, e.target));
+
+  function showScreen() {
+    $('#s-title').textContent = current.title;
+    $('#s-code').textContent = current.code;
+    $('#s-site').textContent = siteRoot().replace(/^https?:\/\//, '');
+    $('#screen').classList.remove('hidden');
+    const side = Math.min(window.innerHeight * 0.62, window.innerWidth * 0.42, 520);
+    K.drawQR($('#s-qr'), current.link, side);
+    const el = $('#screen');
+    if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+    $('#s-close').focus();
+  }
+  function hideScreen() {
+    $('#screen').classList.add('hidden');
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
+  $('#r-full').addEventListener('click', showScreen);
+  $('#mk-show').addEventListener('click', () => { makeRoom(); showScreen(); });
+  $('#s-close').addEventListener('click', hideScreen);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hideScreen(); });
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) $('#screen').classList.add('hidden'); });
+
+  // ---------- 3. настройка формы ----------
+  const F = K.fieldIds();
+  $('#fields').innerHTML = '<thead><tr><th>Идентификатор вопроса</th><th>Заголовок вопроса</th></tr></thead><tbody>' +
+    K.FIELDS.map(f => '<tr><td><code>' + esc(F[f]) + '</code></td><td>' + esc(K.FIELD_TITLES[f]) + '</td></tr>').join('') + '</tbody>';
+  const testR = K.sign({ trainer: K.TRAINERS.P.title, room: K.makeRoom('P'), fio: 'Тестов Тест', group: 'ТЕСТ-00',
+    score: 10, total: 12, mistakes: '3; 7', seconds: 300, consent: 'тестовая отправка' });
+  const testLink = K.formLink(testR);
+  if (K.config.formUrl && testLink) {
+    $('#cfg-status').innerHTML = '<span class="okc">Форма подключена.</span> ' + esc(K.config.formUrl);
+    $('#test-link').href = testLink;
+  } else {
+    $('#cfg-status').innerHTML = '<span class="badc">Форма не подключена.</span> Пока в config.js пустой formUrl, студенты в зачётном режиме получают код результата и присылают его сами.';
+    $('#test-link').classList.add('hidden');
+  }
+  if (K.config.answersUrl) $('#ans-link').innerHTML = '<a href="' + esc(K.config.answersUrl) + '" target="_blank" rel="noopener">Открыть ответы в Яндекс Форме</a>';
+
+  // ---------- 2. результаты ----------
+  let rows = [];
+  const KEYS = {
+    room: ['room', 'комнат'], fio: ['fio', 'фио', 'фамил'], group: ['group', 'групп'], trainer: ['trainer', 'тренаж'],
+    score: ['score', 'балл'], total: ['total', 'всего'], mistakes: ['mistakes', 'ошиб'], seconds: ['seconds', 'длительн'],
+    check: ['check', 'контрол'], sent: ['создан', 'отправлен', 'дата']
+  };
+  function parseExcel(lines) {
+    const out = [];
+    let head = null, idx = null;
+    lines.forEach(line => {
+      if (!line.includes('\t')) return;
+      const cells = line.split('\t').map(c => c.trim().replace(/^"|"$/g, ''));
+      if (!head) {
+        const low = cells.map(c => c.toLowerCase());
+        const find = keys => low.findIndex(h => keys.some(k => h === k || h.includes(k)));
+        const cand = {};
+        Object.keys(KEYS).forEach(k => { cand[k] = find(KEYS[k]); });
+        if (['fio', 'score', 'check'].every(k => cand[k] >= 0)) { head = cells; idx = cand; }
+        return;
+      }
+      const g = k => (idx[k] >= 0 ? (cells[idx[k]] || '').trim() : '');
+      const r = { trainer: g('trainer'), room: g('room'), fio: g('fio'), group: g('group'), score: g('score'),
+        total: g('total'), mistakes: g('mistakes'), seconds: g('seconds'), check: g('check'), sent: g('sent'), source: 'форма' };
+      if (!r.fio && !r.check) return;
+      r.valid = K.hash(K.payload(r)) === r.check;
+      out.push(r);
+    });
+    return { out, head: !!head };
+  }
+
+  $('#parse').addEventListener('click', () => {
+    const lines = $('#paste').value.split(/\r?\n/).filter(l => l.trim());
+    const codes = lines.map(l => K.readResultCode(l)).filter(Boolean).map(r => Object.assign(r, { source: 'код', sent: '' }));
+    const ex = parseExcel(lines);
+    rows = codes.concat(ex.out);
+    const err = $('#p-err');
+    if (!rows.length) {
+      err.textContent = lines.some(l => l.includes('\t')) && !ex.head
+        ? 'Не нашлась строка заголовков: скопируйте таблицу вместе с первой строкой. Нужны как минимум колонки «ФИО», «Баллы», «Контроль».'
+        : 'Не удалось распознать ни одного результата.';
+      $('#res').classList.add('hidden');
+      return;
+    }
+    err.textContent = '';
+    fillFilters();
+    render();
+    $('#res').classList.remove('hidden');
+  });
+  $('#clear').addEventListener('click', () => { $('#paste').value = ''; rows = []; $('#res').classList.add('hidden'); });
+
+  function fillFilters() {
+    const opts = (vals, all) => '<option value="">' + all + '</option>' + vals.map(v => '<option>' + esc(v) + '</option>').join('');
+    $('#f-room').innerHTML = opts([...new Set(rows.map(r => r.room))].filter(Boolean).sort(), 'все');
+    $('#f-tr').innerHTML = opts([...new Set(rows.map(r => r.trainer))].filter(Boolean).sort(), 'все');
+  }
+  $('#f-room').addEventListener('change', render);
+  $('#f-tr').addEventListener('change', render);
+
+  const pctOf = r => (Number(r.total) ? Math.round(Number(r.score) / Number(r.total) * 100) : 0);
+  const fmtTime = s => { s = Number(s) || 0; return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+  function visible() {
+    const fr = $('#f-room').value, ft = $('#f-tr').value;
+    const list = rows.filter(r => (!fr || r.room === fr) && (!ft || r.trainer === ft));
+    list.sort((a, b) => (a.group + a.fio + a.trainer + a.sent).localeCompare(b.group + b.fio + b.trainer + b.sent, 'ru'));
+    const seen = {};
+    list.forEach(r => { const k = r.fio + '|' + r.group + '|' + r.trainer; seen[k] = (seen[k] || 0) + 1; r.attempt = seen[k]; });
+    return list;
+  }
+
+  function render() {
+    const list = visible();
+    const pcts = list.map(pctOf);
+    const avg = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : 0;
+    const passed = pcts.filter(p => p >= 61).length;
+    const people = new Set(list.map(r => r.fio + '|' + r.group)).size;
+    const bad = list.filter(r => !r.valid).length;
+    $('#stats').innerHTML =
+      '<div><span>Результатов</span><b>' + list.length + '</b></div>' +
+      '<div><span>Студентов</span><b>' + people + '</b></div>' +
+      '<div><span>Средний результат</span><b>' + avg + ' %</b></div>' +
+      '<div><span>Не ниже 61 %</span><b>' + passed + ' из ' + list.length + '</b></div>' +
+      '<div><span>Не прошли проверку</span><b' + (bad ? ' class="badc"' : '') + '>' + bad + '</b></div>';
+
+    $('#tbl').innerHTML = '<thead><tr><th>Группа</th><th>ФИО</th><th>Тренажёр</th><th>Комната</th><th>Результат</th>' +
+      '<th>Уровень</th><th>Время</th><th>Ошибки в заданиях</th><th>Проверка</th><th>Отправлено</th></tr></thead><tbody>' +
+      list.map(r => {
+        const p = pctOf(r), lv = K.level(p), letter = K.letterByTitle(r.trainer);
+        const ids = r.mistakes && r.mistakes !== 'нет' ? r.mistakes.split(';').map(s => s.trim()).filter(Boolean) : [];
+        const mist = ids.length ? ids.map(id => '<span title="' + esc(K.data.shortTitle(letter, id)) + '">' + esc(id) + '</span>').join(', ') : '—';
+        return '<tr><td>' + esc(r.group) + '</td><td>' + esc(r.fio) + (r.attempt > 1 ? ' <span class="badge">попытка ' + r.attempt + '</span>' : '') +
+          '</td><td>' + esc(r.trainer) + '</td><td>' + esc(r.room) + '</td><td class="num">' + esc(r.score) + ' из ' + esc(r.total) +
+          ' · ' + p + ' %</td><td>' + lv.text + '</td><td class="num">' + fmtTime(r.seconds) + '</td><td>' + mist +
+          '</td><td>' + (r.valid ? '<span class="okc" title="контрольный код совпал">✓</span>' : '<span class="badc" title="данные изменены после прохождения">✗ изменено</span>') +
+          '</td><td>' + esc(r.sent || r.source) + '</td></tr>';
+      }).join('') + '</tbody>';
+
+    // самые частые ошибки — по каждому тренажёру отдельно
+    const byTr = {};
+    list.forEach(r => {
+      const l = K.letterByTitle(r.trainer);
+      if (!l) return;
+      byTr[l] = byTr[l] || { n: 0, c: {} };
+      byTr[l].n++;
+      (r.mistakes && r.mistakes !== 'нет' ? r.mistakes.split(';') : []).map(s => s.trim()).filter(Boolean)
+        .forEach(id => { byTr[l].c[id] = (byTr[l].c[id] || 0) + 1; });
+    });
+    $('#top').innerHTML = Object.keys(byTr).map(l => {
+      const top = Object.entries(byTr[l].c).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      if (!top.length) return '';
+      return '<h3 style="margin-top:18px">Чаще всего ошибались: ' + esc(K.TRAINERS[l].title) + '</h3><ol class="top">' +
+        top.map(([id, c]) => '<li>Задание ' + esc(id) + ' — ' + c + ' из ' + byTr[l].n + ': ' + esc(K.data.shortTitle(l, id)) + '</li>').join('') + '</ol>';
+    }).join('');
+  }
+
+  $('#csv').addEventListener('click', () => {
+    const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const head = ['Группа', 'ФИО', 'Тренажёр', 'Комната', 'Баллы', 'Всего', 'Процент', 'Уровень', 'Длительность, с', 'Ошибки', 'Проверка', 'Отправлено'];
+    const body = visible().map(r => [r.group, r.fio, r.trainer, r.room, r.score, r.total, pctOf(r), K.level(pctOf(r)).text,
+      r.seconds, r.mistakes, r.valid ? 'совпал' : 'изменено', r.sent || r.source].map(q).join(';'));
+    const blob = new Blob(['﻿' + [head.map(q).join(';')].concat(body).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'результаты-тренажёров.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  });
+})();
+</script>
+</body>
+</html>
